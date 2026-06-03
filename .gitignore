@@ -1,0 +1,109 @@
+# ============================================================================
+# Photo Classifier — .gitignore
+# ============================================================================
+# Strategy: track code, scripts, and folder structure.
+# NEVER track personal photos — they stay on your local machine only.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Data — your personal photos stay private
+# ----------------------------------------------------------------------------
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Common image extensions, just in case any slip outside data/
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.png
+*.heic
+*.HEIC
+*.gif
+*.bmp
+*.tiff
+*.webp
+
+# Exception — allow images inside assets/ (README screenshots, demo GIFs)
+!assets/**
+
+# ----------------------------------------------------------------------------
+# Models — most checkpoints stay local; final model committed for the app
+# ----------------------------------------------------------------------------
+models/*
+!models/.gitkeep
+*.pt
+*.pth
+*.onnx
+*.joblib
+*.pkl
+*.h5
+
+# Allow the final fine-tuned model (uncomment when ready)
+# !models/photo_classifier.pt
+
+# ----------------------------------------------------------------------------
+# Generated plots
+# ----------------------------------------------------------------------------
+**/plots/*
+!**/plots/.gitkeep
+
+# ----------------------------------------------------------------------------
+# Python
+# ----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Lint / type / test caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ----------------------------------------------------------------------------
+# Virtual environments
+# ----------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ----------------------------------------------------------------------------
+# Jupyter
+# ----------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+# ----------------------------------------------------------------------------
+# IDE / editor
+# ----------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ----------------------------------------------------------------------------
+# OS
+# ----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# ----------------------------------------------------------------------------
+# Secrets / runtime
+# ----------------------------------------------------------------------------
+.env
+.streamlit/secrets.toml
+*.log
+runs/
+lightning_logs/

@@ -1,0 +1,6 @@
+# Drop your photos here organized into per-category subfolders, e.g.
+#   data/raw/people/IMG_001.jpg
+#   data/raw/food/IMG_002.jpg
+#   data/raw/pet/IMG_003.jpg
+#   data/raw/landscape/IMG_004.jpg
+# All photos under data/raw/ are gitignored and stay on your local machine.

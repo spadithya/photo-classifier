@@ -1,0 +1,3 @@
+# Trained model checkpoints. The final fine-tuned model
+# (photo_classifier.pt) will be committed once trained — small enough
+# (~45 MB for ResNet18) to fit in git.
