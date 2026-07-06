@@ -1,27 +1,27 @@
 """
-Phase 2 — Build the PyTorch input pipeline (Dataset + DataLoader).
+Phase 2 — Build and visualize the PyTorch input pipeline.
 
-In Phase 1 we looked at raw files. Now we turn those files into batches of
+In Phase 1 we looked at raw files. Phase 2 turns those files into batches of
 tensors the model can train on. Three new ideas:
 
   1. transforms  — how one image file becomes a normalized 224x224 tensor
-                   (defined once in src/preprocess.py, reused everywhere)
+                   (defined in src/preprocess.py)
   2. Dataset     — an indexable collection of (image_tensor, label) pairs
-  3. DataLoader  — batches, shuffles, and parallel-loads a Dataset
+                   (PhotoDataset in src/data.py)
+  3. DataLoader  — batches, shuffles, and loads a Dataset
+                   (assembled by make_dataloaders in src/data.py)
 
-We also do a stratified train/validation split, then visualize one real
-(augmented, un-normalized) batch to confirm images and labels line up.
+The reusable pipeline lives in src/ (so Phase 3+ share it). THIS script's job is
+to build it, sanity-check the shapes, and visualize one real (augmented,
+un-normalized) batch so you can confirm images and labels line up.
 
-This script still doesn't train anything — it only builds and sanity-checks
-the pipeline. Run from the project root:
-
+This script does not train anything. Run from the project root:
     python notebooks/02_dataloader.py
 """
 
 from pathlib import Path
 import sys
 
-# Make src/ importable (same trick as Phase 1).
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,87 +29,15 @@ import matplotlib
 matplotlib.use("Agg")                 # headless-safe backend (works over SSH)
 import matplotlib.pyplot as plt        # noqa: E402
 import torch                           # noqa: E402
-from torch.utils.data import Dataset, DataLoader  # noqa: E402
-from sklearn.model_selection import train_test_split  # noqa: E402
 
-from src.categories import CATEGORIES, NAME_TO_INDEX, INDEX_TO_NAME  # noqa: E402
-from src.preprocess import (  # noqa: E402
-    build_train_transform,
-    build_eval_transform,
-    denormalize,
-    load_image,
-)
+from src.categories import CATEGORIES, INDEX_TO_NAME  # noqa: E402
+from src.data import make_dataloaders                 # noqa: E402
+from src.preprocess import denormalize                # noqa: E402
 
-DATA_DIR = PROJECT_ROOT / "data" / "raw"
 PLOTS_DIR = PROJECT_ROOT / "notebooks" / "plots"
-
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".heic"}
-
 BATCH_SIZE = 32
-VAL_FRACTION = 0.2          # hold out 20% of each class for validation
-SEED = 42                   # fixed so the split is identical every run
 
 
-# ---------------------------------------------------------------------------
-# 1. Index the files: build a list of (path, label) pairs
-# ---------------------------------------------------------------------------
-def build_sample_list():
-    """Walk data/raw/<category>/ and return [(path, label_index), ...].
-
-    The label index comes from NAME_TO_INDEX (src/categories.py), so the model
-    learns OUR defined class order — NOT, say, alphabetical folder order, which
-    is what you'd silently get from torchvision's ImageFolder. We also verify
-    each file opens *now*, once, and skip broken ones — so training never
-    crashes halfway through on a corrupt file.
-    """
-    samples = []
-    skipped = 0
-    for category in CATEGORIES:
-        label = NAME_TO_INDEX[category]
-        folder = DATA_DIR / category
-        if not folder.exists():
-            continue
-        for path in sorted(folder.iterdir()):
-            if not (path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS):
-                continue
-            if load_image(path) is None:
-                skipped += 1
-                continue
-            samples.append((path, label))
-    if skipped:
-        print(f"Skipped {skipped} unreadable file(s).")
-    return samples
-
-
-# ---------------------------------------------------------------------------
-# 2. A custom Dataset over those (path, label) pairs
-# ---------------------------------------------------------------------------
-class PhotoDataset(Dataset):
-    """A list of (image_path, label) pairs, decoded and transformed on demand.
-
-    We store PATHS, not decoded images, so we don't hold 450 images in RAM at
-    once. __getitem__ opens ONE image, applies the transform, and returns
-    (tensor, label). The DataLoader calls __getitem__ repeatedly to assemble a
-    batch. A Dataset only needs two methods: __len__ and __getitem__.
-    """
-
-    def __init__(self, samples, transform):
-        self.samples = samples
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, i):
-        path, label = self.samples[i]
-        img = load_image(path)          # PIL RGB image
-        tensor = self.transform(img)    # -> normalized 224x224 float tensor
-        return tensor, label
-
-
-# ---------------------------------------------------------------------------
-# 3. Reporting / visualization helpers
-# ---------------------------------------------------------------------------
 def print_split_distribution(train_samples, val_samples):
     """Per-class counts in each split — confirms stratification kept balance."""
     def counts(samples):
@@ -152,34 +80,9 @@ def visualize_batch(images, targets, n=16):
     print(f"\nSaved batch preview -> {out}")
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 def main():
-    print(f"Indexing photos in {DATA_DIR} ...")
-    samples = build_sample_list()
-    print(f"Total usable photos: {len(samples)}")
-
-    # Stratified split: keep each class's proportion identical in train and val
-    # (so 'food', with only 50, isn't accidentally starved in one split).
-    labels = [label for _, label in samples]
-    train_samples, val_samples = train_test_split(
-        samples,
-        test_size=VAL_FRACTION,
-        stratify=labels,
-        random_state=SEED,
-    )
-
-    # Train gets augmentation; validation gets the deterministic pipeline.
-    train_ds = PhotoDataset(train_samples, build_train_transform())
-    val_ds = PhotoDataset(val_samples, build_eval_transform())
-
-    # DataLoaders wrap a Dataset to yield batches. shuffle=True on train so the
-    # model doesn't see classes in a fixed order each epoch. num_workers=0 keeps
-    # things simple and robust on Windows (worker subprocesses there need extra
-    # care); we can raise it later if data loading becomes the bottleneck.
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    train_loader, val_loader, train_samples, val_samples = make_dataloaders(batch_size=BATCH_SIZE)
+    print(f"Total usable photos: {len(train_samples) + len(val_samples)}")
 
     # --- Sanity check: pull ONE batch and inspect it ---
     images, targets = next(iter(train_loader))
