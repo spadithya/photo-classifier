@@ -17,7 +17,6 @@ CATEGORIES = [
     "documents",    # documents AND screenshots (receipts, forms, phone screenshots)
     "landscape",    # outdoor / nature / scenery
     "adi",          # you, Adi — photos that are mainly of yourself
-    "home",         # interiors, rooms, furniture, your living space
     "food",         # meals, drinks, snacks
     "lab",          # devices, work gear, equipment, electronics
 ]

@@ -29,7 +29,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.categories import CATEGORIES  # noqa: E402  (import after sys.path edit)
 
-import matplotlib.pyplot as plt
+import matplotlib
+# Use the non-interactive "Agg" backend: it renders plots directly to image
+# files and never tries to open a GUI window. This is what makes the script
+# work on a headless server / over SSH, where there's no display to pop a
+# window into. (With the default backend, plt.show() would block forever
+# waiting for a window you can't see or close.)
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402  (import after backend is set)
 from PIL import Image, UnidentifiedImageError
 
 # --- Optional HEIC support --------------------------------------------------
@@ -156,7 +163,7 @@ def show_sample_grid(per_class: dict[str, list[Path]]) -> None:
         for p in broken_files:
             print(f"    {p}")
 
-    plt.show()  # opens a window; close it to end the script
+    plt.close(fig)  # free the figure's memory; nothing to display headlessly
 
 
 def main() -> None:
