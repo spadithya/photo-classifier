@@ -1,11 +1,14 @@
 # Photo Classifier
 
+**🔗 Live demo: [spadida-photo-classifier.streamlit.app](https://spadida-photo-classifier.streamlit.app/)**
+
 A personal-photo categorizer: a CNN trained with **transfer learning** to sort a
 photo library into content categories — `people`, `documents`, `landscape`,
 `adi` (me), `food`, `lab`. Ships as two tools sharing one model:
 
 1. **Streamlit web app** — drop in a photo or a ZIP, see predictions, download an
-   organized ZIP. Hosted on Streamlit Cloud.
+   organized ZIP. Live at
+   [spadida-photo-classifier.streamlit.app](https://spadida-photo-classifier.streamlit.app/).
 2. **Command-line tool** — point at a local folder of thousands of photos and
    sort them into per-category subfolders on disk.
 
