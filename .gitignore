@@ -41,8 +41,8 @@ models/*
 *.pkl
 *.h5
 
-# Allow the final fine-tuned model (uncomment when ready)
-# !models/photo_classifier.pt
+# Allow the final shipped model (committed for Streamlit Cloud deployment)
+!models/photo_classifier.pt
 
 # ----------------------------------------------------------------------------
 # Generated plots

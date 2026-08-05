@@ -1,3 +1,9 @@
+# Pull PyTorch from the CPU wheel index. This matters for Streamlit Cloud
+# (Linux, no GPU): the default PyPI torch wheel is the multi-GB CUDA build and
+# can fail the deploy. Locally this line is harmless — your CUDA torch is
+# already installed and satisfies the requirement, so pip leaves it alone.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # ============================================================================
 # Photo Classifier — Python dependencies
 # ============================================================================

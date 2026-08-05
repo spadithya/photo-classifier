@@ -1,86 +1,87 @@
 # Photo Classifier
 
-A personal-photo categorizer: train a CNN to sort your photo library into
-folders by content (people, food, pet, landscape, screenshot, …). Ships as
-two tools sharing the same model:
+A personal-photo categorizer: a CNN trained with **transfer learning** to sort a
+photo library into content categories — `people`, `documents`, `landscape`,
+`adi` (me), `food`, `lab`. Ships as two tools sharing one model:
 
-1. **Streamlit web app** — drop in a few photos or a ZIP, see predictions
-   and download an organized ZIP. Hosted on Streamlit Cloud.
-2. **Command-line script** — point at a local folder of 1,000+ photos and
-   organize them into per-category subfolders on disk.
+1. **Streamlit web app** — drop in a photo or a ZIP, see predictions, download an
+   organized ZIP. Hosted on Streamlit Cloud.
+2. **Command-line tool** — point at a local folder of thousands of photos and
+   sort them into per-category subfolders on disk.
 
-> Third project in my [ML curriculum](../curriculum.txt). Follows:
-> - [Maricopa Housing Predictor](../maricopa-housing-predictor) — tabular regression
-> - MNIST Digit Recognizer — neural-net foundations
->
-> This project introduces **transfer learning**, the technique that powers
-> almost all real-world computer vision.
+> Third project in my ML curriculum, after a tabular regressor (Maricopa housing)
+> and MNIST. This one introduces **transfer learning** — reusing an
+> ImageNet-pretrained network instead of training from scratch.
 
-## Status
+## Results
 
-| Phase | Description                                       | Status      |
-|-------|---------------------------------------------------|-------------|
-| 1     | Pick categories + organize photos into folders    | in progress |
-| 2     | Build PyTorch DataLoader + visualize batches      | pending     |
-| 3     | Feature-extraction baseline (frozen ResNet)       | pending     |
-| 4     | Full fine-tuning                                  | pending     |
-| 5     | Evaluate + error analysis                         | pending     |
-| 6     | Streamlit app + CLI organize tool                 | pending     |
+Trained on a small personal dataset (**445 photos**, 6 classes, 80/20 split).
+
+| Approach | Trainable params | Best val accuracy |
+|----------|------------------|-------------------|
+| Frozen ResNet18 + new head (feature extraction) | 3,078 | **97.8%** |
+| Full fine-tuning (all layers unfrozen) | 11.2M | 95.5% — **overfit** |
+
+**The frozen baseline won, and that's the shipped model.** Full fine-tuning drove
+train accuracy to 100% while validation loss *rose* — textbook overfitting when
+11.2M parameters meet ~356 training images. The simpler model generalized better.
+
+**Error analysis** on the 2 validation misses was more revealing than the score:
+- One was a screenshot I had **mislabeled** as `landscape` — the model correctly
+  said `documents`. (Fixing the label → ~98.9% effective accuracy.)
+- One was an `adi`→`people` confusion at low confidence — an inherent overlap
+  (both are humans; the distinction is identity).
 
 ## The two interfaces
 
 ### Streamlit app (`app.py`)
 
-Live at `<your-app-name>.streamlit.app`. Two modes via a sidebar toggle:
+Two modes via a sidebar toggle:
+- **Quick test** — upload one photo, see top-3 predictions with confidence bars.
+- **Bulk organize** — upload photos (or a ZIP), download a ZIP sorted into
+  category subfolders, with low-confidence photos routed to `unsure/`.
 
-- **Quick test** — upload a single photo, see top-3 predictions with confidence bars
-- **Bulk organize** — upload up to ~50 photos (or a ZIP), get back a ZIP with
-  photos sorted into category subfolders
-
-Recruiters and friends can try the model in 30 seconds without setup.
+```bash
+streamlit run app.py
+```
 
 ### CLI tool (`organize.py`)
 
-For actually organizing your local library:
+The workhorse for a real library — streams from disk at constant memory:
 
 ```bash
 python organize.py \
-    --input  "C:\Users\desig\Pictures\unsorted" \
-    --output "C:\Users\desig\Pictures\sorted" \
+    --input  "C:\Users\Shady\Pictures\unsorted" \
+    --output "C:\Users\Shady\Pictures\sorted" \
     --mode   copy \
     --threshold 0.7
 ```
 
-- `--mode copy|move` — copy preserves originals; move is decisive
-- `--threshold` — photos below the confidence cutoff land in `unsure/` for manual review
-- Progress bar shows runtime; ~5-10 minutes for 8,000 photos on CPU
+- `--mode copy|move` — copy preserves originals; move relocates them.
+- `--threshold` — photos below this confidence land in `unsure/` for manual review.
+- Progress bar with ETA; unreadable files are set aside in `unreadable/`.
 
 ## Folder layout
 
 ```
 photo-classifier/
-├── app.py                            # Streamlit web app (two modes)
-├── organize.py                       # CLI for local libraries
-├── src/                              # Shared logic
-│   ├── model.py                      # Load weights + run inference
-│   ├── preprocess.py                 # Image → tensor pipeline
-│   └── categories.py                 # Class name list
-├── notebooks/                        # Training pipeline (Phases 1-5)
-│   ├── 01_inspect_photos.py
-│   ├── 02_dataloader.py
-│   ├── 03_baseline_frozen.py
-│   ├── 04_finetune.py
-│   └── 05_evaluate.py
-├── data/
-│   ├── raw/                          # Your photos, organized by class (gitignored)
-│   │   ├── people/
-│   │   ├── food/
-│   │   ├── pet/
-│   │   └── ...
-│   └── processed/                    # Cached tensors (gitignored)
+├── app.py                      # Streamlit web app (two modes)
+├── organize.py                 # CLI for local libraries
+├── src/                        # Shared logic (imported by everything)
+│   ├── categories.py           # Class list — single source of truth for label order
+│   ├── preprocess.py           # Image → tensor transforms (train + eval)
+│   ├── data.py                 # Dataset + DataLoader pipeline
+│   ├── model.py                # Build ResNet18, freeze/unfreeze, pick device
+│   └── inference.py            # Load model + predict (shared by app & CLI)
+├── notebooks/                  # Training pipeline, one script per phase
+│   ├── 01_inspect_photos.py    # Counts, class balance, sample grid
+│   ├── 02_dataloader.py        # Build + visualize the input pipeline
+│   ├── 03_baseline_frozen.py   # Frozen-backbone baseline (the shipped model)
+│   ├── 04_finetune.py          # Full fine-tuning (overfit; kept for the writeup)
+│   └── 05_evaluate.py          # Confusion matrix + error analysis
+├── data/raw/<category>/        # Your photos, per class (gitignored — never committed)
 ├── models/
-│   └── photo_classifier.pt           # Final fine-tuned weights (committed)
-├── assets/                           # README screenshots, demo GIFs
+│   └── photo_classifier.pt     # Final model (frozen-backbone baseline), committed
 ├── requirements.txt
 ├── README.md
 └── LICENSE
@@ -90,62 +91,63 @@ photo-classifier/
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate                # Windows
-# source .venv/bin/activate           # macOS / Linux
+.venv\Scripts\activate                # Windows  (source .venv/bin/activate on macOS/Linux)
+```
 
+**PyTorch (GPU):** the default PyPI wheel is CPU-only. For an NVIDIA GPU, install
+torch first from the CUDA wheel index, then the rest:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 pip install -r requirements.txt
 ```
 
-PyTorch installation note: the default `pip install torch` pulls the CPU
-build, which is fine for fine-tuning ResNet18 on ~1,000 photos (3-5 min per
-epoch). For GPU acceleration see [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally).
+CPU-only is fine too (just `pip install -r requirements.txt`) — inference on a
+single image is well under a second, which is how the app runs on Streamlit Cloud.
 
-## Prepare your photos
+## Prepare your photos (before Phase 1)
 
-Before Phase 2, organize your training photos into per-class folders:
+Sort training photos into per-class folders whose names match `src/categories.py`:
 
 ```
 data/raw/
-├── people/         (50-200 photos of people)
-├── food/           (50-200 photos of meals, drinks, snacks)
-├── pet/            (50-200 photos of your pet / other pets)
-├── landscape/      (50-200 outdoor / nature photos)
-├── screenshot/     (50-200 phone screenshots)
-└── ...
+├── people/      ├── documents/   ├── landscape/
+├── adi/         ├── food/        └── lab/
 ```
 
-Rough guidelines:
-- 50 photos per class minimum, 200+ is comfortable
-- More classes = harder (start with 6-8, expand later)
-- Roughly equal counts per class (avoid 50/50/50/2000 splits)
-- Photos should be varied — different lighting, angles, subjects
+Guidelines: 50 photos/class minimum (200+ comfortable), roughly balanced, varied
+lighting/angles. `data/` is gitignored — personal photos are never committed.
 
 ## Run the pipeline
 
 ```bash
-python notebooks/01_inspect_photos.py        # Count + visualize per class
-python notebooks/02_dataloader.py            # Build PyTorch dataset
-python notebooks/03_baseline_frozen.py       # Frozen ResNet baseline
-python notebooks/04_finetune.py              # Fine-tune
+python notebooks/01_inspect_photos.py        # Counts + sample grid
+python notebooks/02_dataloader.py            # Build + visualize batches
+python notebooks/03_baseline_frozen.py       # Frozen baseline  -> models/baseline_frozen.pt
+python notebooks/04_finetune.py              # Fine-tune (overfits on this dataset)
 python notebooks/05_evaluate.py              # Confusion matrix + error analysis
-streamlit run app.py                         # Launch the web demo
+
+# Promote the chosen model to the canonical name, then launch the app:
+#   Copy-Item models\baseline_frozen.pt models\photo_classifier.pt
+streamlit run app.py
 ```
 
-## What this project teaches
+## What this project taught me
 
-Beyond what MNIST covered:
-
-- **Loading pretrained models** from `torchvision.models`
-- The **freeze / unfreeze** pattern for transfer learning
-- **ImageNet preprocessing** (mean/std normalization, 224×224 inputs)
-- **Color images** (3 channels) and `torchvision.transforms`
-- **Data augmentation** for tiny datasets (random crops, flips, color jitter)
-- **Custom `Dataset`** classes for your own files
-- **Learning rate tuning** for fine-tuning (typically 10-100× smaller than from-scratch)
-- **Error analysis** — looking at *which* images the model gets wrong, not just the aggregate metric
-- **Two-interface deployment** — same model, web app + CLI
+- **Transfer learning** — loading a pretrained `torchvision` ResNet18 and the
+  freeze / unfreeze pattern.
+- **ImageNet preprocessing** (mean/std normalization, 224×224) and why train and
+  inference transforms must match exactly.
+- **Data augmentation** (random crop, flip, color jitter) for a tiny dataset.
+- **Custom `Dataset`** classes and stratified train/val splits.
+- **Recognizing overfitting** from loss curves — and choosing the simpler model
+  when it generalizes better.
+- **Mixed-precision (AMP)** training on a 6 GB GPU.
+- **Error analysis** — reading the actual mistakes, which surfaced a data-labeling
+  bug the aggregate accuracy hid.
+- **Two-interface deployment** — one model behind a web app and a CLI.
 
 ## License
 
-Code is MIT-licensed ([LICENSE](LICENSE)).
-Personal photos in `data/` are never committed — gitignored by default.
+Code is MIT-licensed ([LICENSE](LICENSE)). Personal photos in `data/` are
+gitignored and never committed.
